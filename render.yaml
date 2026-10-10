@@ -1,0 +1,27 @@
+services:
+  # Web service (Next.js)
+  - type: web
+    name: boylove-web
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: boylove-db
+          property: connectionString
+      - key: NEXTAUTH_URL
+        value: https://boylove-web.onrender.com   # đổi thành tên bạn
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+
+databases:
+  - name: boylove-db
+    plan: free
+    databaseName: boylove
+    user: boylove_user

@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  username String   @unique
+  password String?
+  role     String   @default("USER")
+  reviews  Review[]
+}
+
+model Truyen {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  ten       String
+  tacGia    String
+  anhBia    String?
+  moTa      String?  @db.Text
+  theLoai   String[]
+  tags      String[]
+  warning   String[]
+  diemTB    Float    @default(0)
+  soReview  Int      @default(0)
+  reviews   Review[]
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String
+  truyenId    String
+  tieuDe      String
+  noiDung     String   @db.Text
+  diemNoiDung Float
+  diemNhanVat Float
+  diemCamXuc  Float
+  diemTong    Float
+  spoiler     Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  truyen      Truyen   @relation(fields: [truyenId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}

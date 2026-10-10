@@ -2,8 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-body { font-family: system-ui, -apple-system, sans-serif; }
+/* Custom style chung */
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
 
+/* Tiện ích cắt chữ 2 dòng */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

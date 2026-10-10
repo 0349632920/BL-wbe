@@ -1,5 +1,11 @@
+// ============================================
+// BL Review — Prisma Schema
+// Database: PostgreSQL (Render / Supabase)
+// ============================================
+
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -7,43 +13,231 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// AUTH MODELS (NextAuth)
+// ============================================
+
 model User {
-  id       String   @id @default(cuid())
-  email    String   @unique
-  username String   @unique
-  password String?
-  role     String   @default("USER")
-  reviews  Review[]
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password      String?
+  avatar        String?
+  bio           String?   @db.Text
+  role          String    @default("USER") // USER | MOD | ADMIN
+  emailVerified DateTime?
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // App relations
+  reviews       Review[]
+  comments      Comment[]
+  likes         Like[]
+  bookmarks     Bookmark[]
+  reports       Report[]
+  linksDaThem   LinkTruyen[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+  @@index([username])
 }
 
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// APP MODELS
+// ============================================
+
 model Truyen {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  ten       String
-  tacGia    String
-  anhBia    String?
-  moTa      String?  @db.Text
-  theLoai   String[]
-  tags      String[]
-  warning   String[]
-  diemTB    Float    @default(0)
-  soReview  Int      @default(0)
-  reviews   Review[]
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  ten         String
+  tenKhac     String?
+  tacGia      String
+  hoaSi       String?
+  moTa        String?  @db.Text
+  anhBia      String?
+  quocGia     String   @default("JP") // JP | KR | CN | VN | Khác
+  theLoai     String[] // Đam mỹ, Học đường, Cổ đại...
+  tags        String[] // Ngọt, Ngược, HE, BE, ABO...
+  warning     String[] // 18+, Ngược, SE, Bạo lực...
+  trangThai   String   @default("Đang ra") // Đang ra | Hoàn thành | Tạm dừng
+
+  // Điểm trung bình (auto update khi có review mới)
+  diemTB      Float    @default(0)
+  diemNoiDungTB Float  @default(0)
+  diemNhanVatTB Float  @default(0)
+  diemCamXucTB  Float  @default(0)
+
+  soReview    Int      @default(0)
+  luotXem     Int      @default(0)
+  luotThich   Int      @default(0)
+
+  // Relations
+  reviews     Review[]
+  links       LinkTruyen[]
+  bookmarks   Bookmark[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@index([diemTB])
+  @@index([luotXem])
+  @@index([createdAt])
+}
+
+// Link đọc chính thống (Lezhin, Tapas, Webtoon...)
+model LinkTruyen {
+  id          String   @id @default(cuid())
+  truyenId    String
+  userId      String?  // ai thêm link (null = admin)
+  nenTang     String   // Lezhin | Tapas | Webtoon | Manta...
+  url         String
+  loai        String   @default("official") // official | author | buy
+  ngonNgu     String   @default("vi") // vi | en | ko | ja | zh
+  giaTien     String?
+  isVerified  Boolean  @default(false)
+  trangThai   String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  lyDoTuChoi  String?
+
+  truyen      Truyen   @relation(fields: [truyenId], references: [id], onDelete: Cascade)
+  nguoiThem   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+
+  @@index([truyenId])
+  @@index([trangThai])
 }
 
 model Review {
+  id            String   @id @default(cuid())
+  userId        String
+  truyenId      String
+  tieuDe        String
+  noiDung       String   @db.Text
+  diemNoiDung   Float    @default(0)
+  diemNhanVat   Float    @default(0)
+  diemCamXuc    Float    @default(0)
+  diemTong      Float    @default(0)
+  spoiler       Boolean  @default(false)
+  trangThai     String   @default("APPROVED") // PENDING | APPROVED | REJECTED
+  lyDoTuChoi    String?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  truyen        Truyen   @relation(fields: [truyenId], references: [id], onDelete: Cascade)
+  comments      Comment[]
+  likes         Like[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([truyenId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([trangThai])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  reviewId  String
+  parentId  String?  // reply 1 cấp
+  noiDung   String   @db.Text
+  trangThai String   @default("APPROVED") // PENDING | APPROVED | HIDDEN
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reviewId])
+  @@index([userId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  reviewId  String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reviewId])
+  @@index([reviewId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  truyenId  String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  truyen    Truyen   @relation(fields: [truyenId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, truyenId])
+  @@index([userId])
+}
+
+model Report {
   id          String   @id @default(cuid())
   userId      String
-  truyenId    String
-  tieuDe      String
-  noiDung     String   @db.Text
-  diemNoiDung Float
-  diemNhanVat Float
-  diemCamXuc  Float
-  diemTong    Float
-  spoiler     Boolean  @default(false)
+  targetType  String   // review | comment | link | user
+  targetId    String
+  lyDo        String
+  chiTiet     String?  @db.Text
+  trangThai   String   @default("PENDING") // PENDING | RESOLVED | REJECTED
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  truyen      Truyen   @relation(fields: [truyenId], references: [id], onDelete: Cascade)
+
   createdAt   DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([trangThai])
 }
